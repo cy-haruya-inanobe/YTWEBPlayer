@@ -107,16 +107,24 @@ class YouTubePlayer {
     createPlaylistItem(video, index) {
         const listItem = document.createElement("li");
         listItem.className = "playlist-item";
+        listItem.addEventListener("click", (event) => {
+            // Deleteボタンがクリックされた場合は、動画を切り替えない
+            if (!event.target.classList.contains('delete-button')) {
+                this.fadeToVideo(index);
+            }
+        });
 
         const titleSpan = document.createElement("span");
         titleSpan.className = "playlist-item-title";
         titleSpan.textContent = video.title;
-        titleSpan.addEventListener("click", () => this.fadeToVideo(index));
 
         const deleteButton = document.createElement("button");
         deleteButton.className = "delete-button";
         deleteButton.textContent = "Delete";
-        deleteButton.addEventListener("click", () => this.deleteVideo(index));
+        deleteButton.addEventListener("click", (event) => {
+            event.stopPropagation(); // イベントの伝播を停止
+            this.deleteVideo(index);
+        });
 
         listItem.appendChild(titleSpan);
         listItem.appendChild(deleteButton);
