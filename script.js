@@ -35,9 +35,18 @@ class YouTubePlayer {
                 controls: 1,
                 rel: 0,
                 modestbranding: 1,
-                host: 'https://www.youtube-nocookie.com' // プライバシー強化モード
+                enablejsapi: 1, // APIを有効化
+                origin: window.location.origin
             }
         });
+
+        // プレーヤーのiframeのsrcを直接変更
+        const playerElement = document.getElementById("player");
+        const currentSrc = playerElement.src;
+        playerElement.src = currentSrc.replace(
+            /^https:\/\/www\.youtube(-nocookie)?\.com/,
+            'https://www.youtube-nocookie.com/embed/'.slice(0, -1)  // 最後のスラッシュを除去
+        );
     }
 
     onPlayerReady() {
