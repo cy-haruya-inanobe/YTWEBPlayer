@@ -54,7 +54,6 @@ class YouTubePlayer {
         this.isPlayerReady = true;
         this.initializeControls();
         this.startVolumeUpdateInterval();
-        this.initializePlaylist();
     }
 
     startVolumeUpdateInterval() {
