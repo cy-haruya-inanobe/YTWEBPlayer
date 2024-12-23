@@ -44,6 +44,13 @@ class YouTubePlayer {
         this.isPlayerReady = true;
         this.startVolumeUpdateInterval();
         this.initializePlaylist(); // プレイリストを再初期化
+
+        const playerElement = document.getElementById("player");
+        const currentSrc = playerElement.src;
+        playerElement.src = currentSrc.replace(
+            /^https:\/\/www\.youtube(-nocookie)?\.com/,
+            'https://www.youtube-nocookie.com/'.slice(0, -1)
+        );
     }
 
     onPlayerError(event) {
