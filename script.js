@@ -1,6 +1,6 @@
 class YouTubePlayer {
     constructor() {
-        this.videos = this.loadPlaylist() || [
+        this.videos = [
             { id: "dQw4w9WgXcQ", title: "Never Gonna Give You Up" },
             { id: "3JZ_D3ELwOQ", title: "Take On Me" }
         ];
@@ -12,13 +12,12 @@ class YouTubePlayer {
         this.isChangingVideo = false;
         this.player = null;
         this.isPlayerReady = false;
-        this.currentVolume = 1000;
-        this.targetVolume = 1000;
+        this.currentVolume = 100.0;
+        this.targetVolume = 100.0;
         this.volumeUpdateInterval = null;
     }
 
     init() {
-        this.initializePlaylist();
         this.initializeYouTubePlayer();
         this.initializeEventListeners();
     }
@@ -35,12 +34,16 @@ class YouTubePlayer {
             playerVars: {
                 controls: 1,
                 rel: 0,
-                modestbranding: 1,
-                enablejsapi: 1, // APIを有効化
-                origin: window.location.origin
+                modestbranding: 1
             }
         });
+    }
 
+    onPlayerReady() {
+        this.isPlayerReady = true;
+        this.initializeControls();
+        this.startVolumeUpdateInterval();
+        
         // プレーヤーのiframeのsrcを直接変更
         const playerElement = document.getElementById("player");
         const currentSrc = playerElement.src;
@@ -50,17 +53,11 @@ class YouTubePlayer {
         );
     }
 
-    onPlayerReady() {
-        this.isPlayerReady = true;
-        this.initializeControls();
-        this.startVolumeUpdateInterval();
-    }
-
     startVolumeUpdateInterval() {
         this.volumeUpdateInterval = setInterval(() => {
             if (this.isPlayerReady && !this.isChangingVideo && !this.fadePromise) {
-                const youtubeVolume = this.player.getVolume() * 10;
-                if (Math.abs(youtubeVolume - this.currentVolume) > 1) {
+                const youtubeVolume = this.player.getVolume();
+                if (Math.abs(youtubeVolume - this.currentVolume) > 0.1) {
                     this.currentVolume = youtubeVolume;
                     this.targetVolume = youtubeVolume;
                     this.updateVolumeSlider(youtubeVolume);
@@ -76,6 +73,7 @@ class YouTubePlayer {
     }
 
     initializeControls() {
+        this.initializePlaylist();
         this.initializeVolumeControl();
         this.initializeLoopToggle();
         this.initializeFadeToggle();
@@ -109,29 +107,19 @@ class YouTubePlayer {
     createPlaylistItem(video, index) {
         const listItem = document.createElement("li");
         listItem.className = "playlist-item";
-    
+
         const titleSpan = document.createElement("span");
         titleSpan.className = "playlist-item-title";
         titleSpan.textContent = video.title;
-    
+        titleSpan.addEventListener("click", () => this.fadeToVideo(index));
+
         const deleteButton = document.createElement("button");
         deleteButton.className = "delete-button";
         deleteButton.textContent = "Delete";
-        deleteButton.addEventListener("click", (e) => {
-            e.stopPropagation(); // イベントの伝播を停止
-            this.deleteVideo(index);
-        });
-    
+        deleteButton.addEventListener("click", () => this.deleteVideo(index));
+
         listItem.appendChild(titleSpan);
         listItem.appendChild(deleteButton);
-    
-        // リストアイテム全体にクリックイベントリスナーを追加
-        listItem.addEventListener("click", (e) => {
-            if (e.target !== deleteButton) {
-                this.fadeToVideo(index);
-            }
-        });
-    
         return listItem;
     }
 
@@ -145,7 +133,6 @@ class YouTubePlayer {
                 this.currentVideoIndex--;
             }
             this.initializePlaylist();
-            this.savePlaylist();
         } else {
             alert("Cannot delete the last video in the playlist.");
         }
@@ -205,7 +192,7 @@ class YouTubePlayer {
 
     setVolumeWithoutUpdate(volume) {
         if (!this.isPlayerReady) return;
-        this.player.setVolume(volume / 10);
+        this.player.setVolume(volume);
         this.updateVolumeSlider(volume);
     }
 
@@ -213,13 +200,17 @@ class YouTubePlayer {
         if (!this.isPlayerReady) return;
         this.cancelFade();
         this.targetVolume = volume;
-        this.currentVolume = volume;
-        this.setVolumeWithoutUpdate(volume);
+        if (this.isFading && !this.isChangingVideo) {
+            this.fade(volume);
+        } else {
+            this.currentVolume = volume;
+            this.setVolumeWithoutUpdate(volume);
+        }
     }
 
     updateVolumeDisplay(volume) {
         const volumeLabel = document.getElementById("volume-label");
-        volumeLabel.textContent = `Volume: ${(volume / 10).toFixed(1)}%`;
+        volumeLabel.textContent = `Volume: ${volume.toFixed(1)}%`;
     }
 
     playVideo(index) {
@@ -234,13 +225,16 @@ class YouTubePlayer {
 
     initializeVolumeControl() {
         const volumeSlider = document.getElementById("volume-slider");
+        volumeSlider.min = "0";
+        volumeSlider.max = "100";
+        volumeSlider.step = "1";
         volumeSlider.addEventListener("input", () => {
-            const volume = parseInt(volumeSlider.value);
-            this.setVolume(volume);
+            this.targetVolume = parseFloat(volumeSlider.value);
+            this.setVolume(this.targetVolume);
         });
         
         if (this.isPlayerReady) {
-            const initialVolume = this.player.getVolume() * 10;
+            const initialVolume = this.player.getVolume();
             this.setVolume(initialVolume);
         }
     }
@@ -281,21 +275,11 @@ class YouTubePlayer {
         if (videoId && videoTitle) {
             this.videos.push({ id: videoId, title: videoTitle });
             this.initializePlaylist();
-            this.savePlaylist();
             videoUrlInput.value = "";
             videoTitleInput.value = "";
         } else {
             alert("Please enter a valid YouTube URL and title.");
         }
-    }
-
-    savePlaylist() {
-        localStorage.setItem('youtubePlayerPlaylist', JSON.stringify(this.videos));
-    }
-
-    loadPlaylist() {
-        const savedPlaylist = localStorage.getItem('youtubePlayerPlaylist');
-        return savedPlaylist ? JSON.parse(savedPlaylist) : null;
     }
 }
 
