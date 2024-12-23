@@ -126,7 +126,11 @@ class YouTubePlayer {
         listItem.appendChild(deleteButton);
     
         // リストアイテム全体にクリックイベントリスナーを追加
-        listItem.addEventListener("click", () => this.fadeToVideo(index));
+        listItem.addEventListener("click", (e) => {
+            if (e.target !== deleteButton) {
+                this.fadeToVideo(index);
+            }
+        });
     
         return listItem;
     }
