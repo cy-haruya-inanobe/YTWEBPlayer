@@ -45,7 +45,7 @@ class YouTubePlayer {
         const currentSrc = playerElement.src;
         playerElement.src = currentSrc.replace(
             /^https:\/\/www\.youtube(-nocookie)?\.com/,
-            'https://www.youtube-nocookie.com/embed/'.slice(0, -1)  // 最後のスラッシュを除去
+            'https://www.youtube-nocookie.com/'.slice(0, -1)  // 最後のスラッシュを除去
         );
     }
 
