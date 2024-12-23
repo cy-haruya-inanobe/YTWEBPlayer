@@ -21,10 +21,11 @@ class YouTubePlayer {
     }
 
     initializeYouTubePlayer() {
+        const defaultVideoId = "dQw4w9WgXcQ"; // デフォルトの動画ID
         this.player = new YT.Player("player", {
             height: "360",
             width: "480",
-            videoId: this.videos[0]?.id || "",
+            videoId: this.videos.length > 0 ? this.videos[0].id : defaultVideoId,
             events: {
                 onReady: () => this.onPlayerReady(),
                 onStateChange: (event) => this.onPlayerStateChange(event)
@@ -247,6 +248,7 @@ class YouTubePlayer {
 
     initializeLoopToggle() {
         const loopButton = document.getElementById("loop-toggle");
+        loopButton.textContent = `Loop: ${this.isLooping ? "On" : "Off"}`;
         loopButton.addEventListener("click", () => {
             this.isLooping = !this.isLooping;
             loopButton.textContent = `Loop: ${this.isLooping ? "On" : "Off"}`;
@@ -256,6 +258,7 @@ class YouTubePlayer {
 
     initializeFadeToggle() {
         const fadeToggle = document.getElementById("fade-toggle");
+        fadeToggle.textContent = `Fade: ${this.isFading ? "On" : "Off"}`;
         fadeToggle.addEventListener("click", () => {
             this.isFading = !this.isFading;
             fadeToggle.textContent = `Fade: ${this.isFading ? "On" : "Off"}`;
@@ -309,12 +312,19 @@ class YouTubePlayer {
             this.currentVideoIndex = playlistData.currentVideoIndex;
             this.isLooping = playlistData.isLooping;
             this.isFading = playlistData.isFading;
-        } else {
-            // デフォルトのプレイリスト
+        }
+
+        // プレイリストが空の場合、デフォルトの動画を追加
+        if (this.videos.length === 0) {
             this.videos = [
                 { id: "dQw4w9WgXcQ", title: "Never Gonna Give You Up" },
                 { id: "3JZ_D3ELwOQ", title: "Take On Me" }
             ];
+        }
+
+        // currentVideoIndexが範囲外の場合、0にリセット
+        if (this.currentVideoIndex >= this.videos.length) {
+            this.currentVideoIndex = 0;
         }
     }
 }
@@ -325,3 +335,14 @@ function onYouTubeIframeAPIReady() {
     youtubePlayer = new YouTubePlayer();
     youtubePlayer.init();
 }
+
+// YouTube IFrame API の読み込み
+function loadYouTubeIframeAPI() {
+    const tag = document.createElement('script');
+    tag.src = "https://www.youtube.com/iframe_api";
+    const firstScriptTag = document.getElementsByTagName('script')[0];
+    firstScriptTag.parentNode.insertBefore(tag, firstScriptTag);
+}
+
+// ページ読み込み時に YouTube IFrame API を読み込む
+window.addEventListener('load', loadYouTubeIframeAPI);
