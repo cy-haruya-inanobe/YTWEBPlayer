@@ -18,6 +18,7 @@ class YouTubePlayer {
     }
 
     init() {
+        this.initializePlaylist();
         this.initializeYouTubePlayer();
         this.initializeEventListeners();
     }
@@ -53,6 +54,7 @@ class YouTubePlayer {
         this.isPlayerReady = true;
         this.initializeControls();
         this.startVolumeUpdateInterval();
+        this.initializePlaylist();
     }
 
     startVolumeUpdateInterval() {
@@ -75,7 +77,6 @@ class YouTubePlayer {
     }
 
     initializeControls() {
-        this.initializePlaylist();
         this.initializeVolumeControl();
         this.initializeLoopToggle();
         this.initializeFadeToggle();
