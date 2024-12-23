@@ -1,9 +1,6 @@
 class YouTubePlayer {
     constructor() {
-        this.videos = [
-            { id: "dQw4w9WgXcQ", title: "Never Gonna Give You Up" },
-            { id: "3JZ_D3ELwOQ", title: "Take On Me" }
-        ];
+        this.videos = [];
         this.currentVideoIndex = 0;
         this.isLooping = false;
         this.isFading = true;
@@ -18,6 +15,7 @@ class YouTubePlayer {
     }
 
     init() {
+        this.loadPlaylistFromStorage();
         this.initializeYouTubePlayer();
         this.initializeEventListeners();
     }
@@ -44,12 +42,11 @@ class YouTubePlayer {
         this.initializeControls();
         this.startVolumeUpdateInterval();
         
-        // プレーヤーのiframeのsrcを直接変更
         const playerElement = document.getElementById("player");
         const currentSrc = playerElement.src;
         playerElement.src = currentSrc.replace(
             /^https:\/\/www\.youtube(-nocookie)?\.com/,
-            'https://www.youtube-nocookie.com/'.slice(0, -1)  // 最後のスラッシュを除去
+            'https://www.youtube-nocookie.com/'.slice(0, -1)
         );
     }
 
@@ -108,7 +105,6 @@ class YouTubePlayer {
         const listItem = document.createElement("li");
         listItem.className = "playlist-item";
         listItem.addEventListener("click", (event) => {
-            // Deleteボタンがクリックされた場合は、動画を切り替えない
             if (!event.target.classList.contains('delete-button')) {
                 this.fadeToVideo(index);
             }
@@ -122,7 +118,7 @@ class YouTubePlayer {
         deleteButton.className = "delete-button";
         deleteButton.textContent = "Delete";
         deleteButton.addEventListener("click", (event) => {
-            event.stopPropagation(); // イベントの伝播を停止
+            event.stopPropagation();
             this.deleteVideo(index);
         });
 
@@ -141,6 +137,7 @@ class YouTubePlayer {
                 this.currentVideoIndex--;
             }
             this.initializePlaylist();
+            this.savePlaylistToStorage();
         } else {
             alert("Cannot delete the last video in the playlist.");
         }
@@ -225,6 +222,7 @@ class YouTubePlayer {
         if (!this.isPlayerReady) return;
         this.currentVideoIndex = index;
         this.player.loadVideoById(this.videos[index].id);
+        this.savePlaylistToStorage();
     }
 
     playNextVideo() {
@@ -252,6 +250,7 @@ class YouTubePlayer {
         loopButton.addEventListener("click", () => {
             this.isLooping = !this.isLooping;
             loopButton.textContent = `Loop: ${this.isLooping ? "On" : "Off"}`;
+            this.savePlaylistToStorage();
         });
     }
 
@@ -260,6 +259,7 @@ class YouTubePlayer {
         fadeToggle.addEventListener("click", () => {
             this.isFading = !this.isFading;
             fadeToggle.textContent = `Fade: ${this.isFading ? "On" : "Off"}`;
+            this.savePlaylistToStorage();
         });
     }
 
@@ -283,10 +283,38 @@ class YouTubePlayer {
         if (videoId && videoTitle) {
             this.videos.push({ id: videoId, title: videoTitle });
             this.initializePlaylist();
+            this.savePlaylistToStorage();
             videoUrlInput.value = "";
             videoTitleInput.value = "";
         } else {
             alert("Please enter a valid YouTube URL and title.");
+        }
+    }
+
+    savePlaylistToStorage() {
+        const playlistData = {
+            videos: this.videos,
+            currentVideoIndex: this.currentVideoIndex,
+            isLooping: this.isLooping,
+            isFading: this.isFading
+        };
+        localStorage.setItem('youtubePlayerPlaylist', JSON.stringify(playlistData));
+    }
+
+    loadPlaylistFromStorage() {
+        const storedData = localStorage.getItem('youtubePlayerPlaylist');
+        if (storedData) {
+            const playlistData = JSON.parse(storedData);
+            this.videos = playlistData.videos;
+            this.currentVideoIndex = playlistData.currentVideoIndex;
+            this.isLooping = playlistData.isLooping;
+            this.isFading = playlistData.isFading;
+        } else {
+            // デフォルトのプレイリスト
+            this.videos = [
+                { id: "dQw4w9WgXcQ", title: "Never Gonna Give You Up" },
+                { id: "3JZ_D3ELwOQ", title: "Take On Me" }
+            ];
         }
     }
 }
