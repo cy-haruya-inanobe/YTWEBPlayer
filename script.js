@@ -24,7 +24,7 @@ class YouTubePlayer {
         const defaultVideoId = "dQw4w9WgXcQ"; // デフォルトの動画ID
         this.player = new YT.Player("player", {
             height: "360",
-            width: "480",
+            width: "640",
             videoId: this.videos.length > 0 ? this.videos[0].id : defaultVideoId,
             events: {
                 onReady: () => this.onPlayerReady(),
@@ -42,13 +42,6 @@ class YouTubePlayer {
         this.isPlayerReady = true;
         this.initializeControls();
         this.startVolumeUpdateInterval();
-        
-        const playerElement = document.getElementById("player");
-        const currentSrc = playerElement.src;
-        playerElement.src = currentSrc.replace(
-            /^https:\/\/www\.youtube(-nocookie)?\.com/,
-            'https://www.youtube-nocookie.com/'.slice(0, -1)
-        );
     }
 
     startVolumeUpdateInterval() {
@@ -66,7 +59,7 @@ class YouTubePlayer {
 
     updateVolumeSlider(volume) {
         const volumeSlider = document.getElementById("volume-slider");
-        volumeSlider.value = volume;
+        volumeSlider.value = volume * 10;
         this.updateVolumeDisplay(volume);
     }
 
@@ -232,11 +225,8 @@ class YouTubePlayer {
 
     initializeVolumeControl() {
         const volumeSlider = document.getElementById("volume-slider");
-        volumeSlider.min = "0";
-        volumeSlider.max = "100";
-        volumeSlider.step = "1";
         volumeSlider.addEventListener("input", () => {
-            this.targetVolume = parseFloat(volumeSlider.value);
+            this.targetVolume = parseFloat(volumeSlider.value) / 10;
             this.setVolume(this.targetVolume);
         });
         
@@ -307,11 +297,17 @@ class YouTubePlayer {
     loadPlaylistFromStorage() {
         const storedData = localStorage.getItem('youtubePlayerPlaylist');
         if (storedData) {
-            const playlistData = JSON.parse(storedData);
-            this.videos = playlistData.videos;
-            this.currentVideoIndex = playlistData.currentVideoIndex;
-            this.isLooping = playlistData.isLooping;
-            this.isFading = playlistData.isFading;
+            try {
+                const playlistData = JSON.parse(storedData);
+                this.videos = Array.isArray(playlistData.videos) ? playlistData.videos : [];
+                this.currentVideoIndex = typeof playlistData.currentVideoIndex === 'number' ? playlistData.currentVideoIndex : 0;
+                this.isLooping = !!playlistData.isLooping;
+                this.isFading = playlistData.isFading !== false;  // デフォルトはtrue
+            } catch (error) {
+                console.error('Error parsing stored playlist data:', error);
+                this.videos = [];
+                this.currentVideoIndex = 0;
+            }
         }
 
         // プレイリストが空の場合、デフォルトの動画を追加
