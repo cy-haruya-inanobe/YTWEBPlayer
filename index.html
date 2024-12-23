@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>YouTube Web Player with Volume Control</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <h1>YouTube Web Player</h1>
+    <div id="player-container">
+        <div id="player"></div>
+        <div id="volume-slider-container">
+            <input id="volume-slider" type="range" min="0" max="1000" value="1000" step="1">
+            <label id="volume-label">Volume: 100.0%</label>
+        </div>
+    </div>
+    <button id="loop-toggle">Loop: Off</button>
+    <button id="fade-toggle">Fade: On</button>
+    <h2>Playlist</h2>
+    <ul id="playlist"></ul>
+
+    <form id="add-video-form">
+        <h3>Add Video to Playlist</h3>
+        <input type="text" id="video-url" placeholder="Enter YouTube Video URL" required>
+        <input type="text" id="video-title" placeholder="Enter Video Title" required>
+        <button type="submit">Add Video</button>
+    </form>
+
+    <script src="https://www.youtube.com/iframe_api"></script>
+    <script src="script.js"></script>
+</body>
+</html>
