@@ -34,7 +34,8 @@ class YouTubePlayer {
             playerVars: {
                 controls: 1,
                 rel: 0,
-                modestbranding: 1
+                modestbranding: 1,
+                host: 'https://www.youtube-nocookie.com' // プライバシー強化モード
             }
         });
     }
