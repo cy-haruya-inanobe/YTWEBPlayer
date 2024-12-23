@@ -18,6 +18,7 @@ class YouTubePlayer {
         this.loadPlaylistFromStorage();
         this.initializeYouTubePlayer();
         this.initializeEventListeners();
+        this.initializeControls(); // ここで初期化を行う
     }
 
     initializeYouTubePlayer() {
@@ -28,7 +29,8 @@ class YouTubePlayer {
             videoId: this.videos.length > 0 ? this.videos[0].id : defaultVideoId,
             events: {
                 onReady: () => this.onPlayerReady(),
-                onStateChange: (event) => this.onPlayerStateChange(event)
+                onStateChange: (event) => this.onPlayerStateChange(event),
+                onError: (event) => this.onPlayerError(event)
             },
             playerVars: {
                 controls: 1,
@@ -40,8 +42,14 @@ class YouTubePlayer {
 
     onPlayerReady() {
         this.isPlayerReady = true;
-        this.initializeControls();
         this.startVolumeUpdateInterval();
+        this.initializePlaylist(); // プレイリストを再初期化
+    }
+
+    onPlayerError(event) {
+        console.error('YouTube player error:', event.data);
+        alert('An error occurred with the YouTube player. The page will be reloaded.');
+        location.reload();
     }
 
     startVolumeUpdateInterval() {
@@ -331,3 +339,12 @@ function onYouTubeIframeAPIReady() {
     youtubePlayer = new YouTubePlayer();
     youtubePlayer.init();
 }
+
+// ページ読み込み完了時の処理
+window.addEventListener('load', () => {
+    // YouTube IFrame API がまだ読み込まれていない場合の対策
+    if (typeof YT === 'undefined' || typeof YT.Player === 'undefined') {
+        console.warn('YouTube IFrame API not loaded. Retrying in 1 second...');
+        setTimeout(() => location.reload(), 1000);
+    }
+});
