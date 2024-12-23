@@ -335,14 +335,3 @@ function onYouTubeIframeAPIReady() {
     youtubePlayer = new YouTubePlayer();
     youtubePlayer.init();
 }
-
-// YouTube IFrame API の読み込み
-function loadYouTubeIframeAPI() {
-    const tag = document.createElement('script');
-    tag.src = "https://www.youtube.com/iframe_api";
-    const firstScriptTag = document.getElementsByTagName('script')[0];
-    firstScriptTag.parentNode.insertBefore(tag, firstScriptTag);
-}
-
-// ページ読み込み時に YouTube IFrame API を読み込む
-window.addEventListener('load', loadYouTubeIframeAPI);
