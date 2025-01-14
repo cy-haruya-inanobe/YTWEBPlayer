@@ -3,30 +3,55 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>YouTube Web Player with Volume Control</title>
+    <title>Simple YouTube Player</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.3/css/all.min.css">
     <link rel="stylesheet" href="styles.css">
 </head>
 <body>
-    <h1>YouTube Web Player</h1>
-    <div id="player-container">
-        <div id="player"></div>
-        <div id="volume-slider-container">
-            <input id="volume-slider" type="range" min="0" max="1000" value="1000" step="1">
-            <label id="volume-label">Volume: 100.0%</label>
+    <div id="app">
+        <h1>Simple YouTube Player</h1>
+        <div id="message" style="display: none;"></div>
+        <div id="player-container" style="display: none;">
+            <div id="player"></div>
+            <div id="controls">
+                <div class="control-group">
+                    <label for="volume">Volume</label>
+                    <div class="knob-container">
+                        <div class="knob" id="volume-knob"></div>
+                        <div class="knob-value" id="volume-value">100</div>
+                    </div>
+                    <input type="range" id="volume" min="0" max="100" step="1" value="100" style="display: none;">
+                </div>
+                <div class="control-group">
+                    <label for="fade-speed">Fade Speed</label>
+                    <div class="knob-container">
+                        <div class="knob" id="fade-speed-knob"></div>
+                        <div class="knob-value" id="fade-speed-value">1.0</div>
+                    </div>
+                    <input type="range" id="fade-speed" min="0" max="5" step="0.1" value="1.0" style="display: none;">
+                </div>
+                <div class="control-group">
+                    <label for="playback-rate">Playback Speed</label>
+                    <div class="knob-container">
+                        <div class="knob" id="playback-rate-knob"></div>
+                        <div class="knob-value" id="playback-rate-value">1.0</div>
+                    </div>
+                    <input type="range" id="playback-rate" min="0.5" max="2" step="0.1" value="1" style="display: none;">
+                </div>
+                <div class="control-group">
+                    <button id="loop-toggle" class="toggle-button">Loop: Off</button>
+                    <button id="shuffle-toggle" class="toggle-button">Shuffle: Off</button>
+                </div>
+            </div>
+        </div>
+        <div id="playlist-container">
+            <div id="add-video-form">
+                <input type="text" id="video-url" placeholder="Enter YouTube URL">
+                <button id="add-video"><i class="fas fa-plus"></i> Add Video</button>
+            </div>
+            <ul id="playlist"></ul>
         </div>
     </div>
-    <button id="loop-toggle">Loop: Off</button>
-    <button id="fade-toggle">Fade: On</button>
-    <h2>Playlist</h2>
-    <ul id="playlist"></ul>
-
-    <form id="add-video-form">
-        <h3>Add Video to Playlist</h3>
-        <input type="text" id="video-url" placeholder="Enter YouTube Video URL" required>
-        <input type="text" id="video-title" placeholder="Enter Video Title" required>
-        <button type="submit">Add Video</button>
-    </form>
-
     <script src="https://www.youtube.com/iframe_api"></script>
     <script src="script.js"></script>
 </body>
