@@ -1588,6 +1588,115 @@ function loadYouTubeAPI() {
     };
 }
 
+// 動画情報を取得する関数（ytdlの仕組みを参考に）
+async function getVideoInfo(videoId) {
+    try {
+        const response = await fetch(`https://www.youtube.com/get_video_info?video_id=${videoId}`);
+        const data = await response.text();
+        const decodedData = decodeURIComponent(data);
+        const playerResponse = JSON.parse(decodedData.split('player_response=')[1].split('&')[0]);
+        return playerResponse.videoDetails;
+    } catch (error) {
+        console.error('動画情報の取得に失敗しました:', error);
+        return null;
+    }
+}
+
+// 広告ブロック機能の強化
+function enhancedBlockAds() {
+    const adElements = document.querySelectorAll('.ytp-ad-module, .ytp-ad-image-overlay, .video-ads, .ytp-ad-text');
+    adElements.forEach(el => el.style.display = 'none');
+
+    const videoAds = document.querySelectorAll('.ad-showing');
+    videoAds.forEach(ad => {
+        if (player && player.getCurrentTime && player.getDuration) {
+            player.seekTo(player.getDuration());
+        }
+    });
+
+    // 広告関連のイベントリスナーを無効化
+    if (player && player.removeEventListener) {
+        player.removeEventListener('onAdStart');
+        player.removeEventListener('onAdEnd');
+    }
+}
+
+// プレイヤーの状態が変化したときに呼び出される関数（更新版）
+function onPlayerStateChange(event) {
+    if (event.data == YT.PlayerState.ENDED) {
+        if (isLooping) {
+            player.seekTo(0);
+            player.playVideo();
+        } else {
+            playNextVideo();
+        }
+    } else if (event.data == YT.PlayerState.PLAYING) {
+        player.setPlaybackRate(playbackRate);
+        enhancedBlockAds();
+    }
+}
+
+// 動画の直接URLを使用したストリーミング（注意：YouTubeの利用規約に違反する可能性があります）
+async function getDirectVideoUrl(videoId) {
+    try {
+        const info = await getVideoInfo(videoId);
+        if (info && info.streamingData && info.streamingData.formats) {
+            return info.streamingData.formats[0].url;
+        }
+    } catch (error) {
+        console.error('動画の直接URLの取得に失敗しました:', error);
+    }
+    return null;
+}
+
+// プレイヤーの初期化（更新版）
+async function initPlayer(videoId) {
+    console.log('プレイヤーの初期化を開始します。Video ID:', videoId);
+    if (typeof YT === 'undefined' || !YT.Player) {
+        throw new Error('YouTube IFrame APIが読み込まれていません');
+    }
+
+    const directUrl = await getDirectVideoUrl(videoId);
+    const playerVars = {
+        'autoplay': 1,
+        'controls': 1,
+        'rel': 0,
+        'fs': 1,
+        'modestbranding': 1,
+        'iv_load_policy': 3,
+        'disablekb': 1
+    };
+
+    if (directUrl) {
+        playerVars.url = directUrl;
+    }
+
+    return new Promise((resolve, reject) => {
+        try {
+            player = new YT.Player('player', {
+                height: '360',
+                width: '640',
+                videoId: directUrl ? null : videoId,
+                playerVars: playerVars,
+                events: {
+                    'onReady': (event) => {
+                        console.log('プレイヤーの初期化が完了しました。');
+                        resolve(event.target);
+                    },
+                    'onStateChange': onPlayerStateChange,
+                    'onError': (event) => {
+                        console.error('YouTube Player Error:', event.data);
+                        reject(new Error('プレイヤーの初期化中にエラーが発生しました'));
+                    }
+                }
+            });
+        } catch (error) {
+            console.error('プレイヤーの初期化中にエラーが発生しました:', error);
+            reject(error);
+        }
+    });
+}
+
 // 広告ブロッカーによるエラーを処理する関数
 function handleAdBlockerError() {
     window.addEventListener('error', function(e) {
