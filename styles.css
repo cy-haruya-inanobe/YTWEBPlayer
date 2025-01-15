@@ -105,6 +105,16 @@ label {
     box-shadow: 0 2px 5px rgba(0, 0, 0, 0.3);
     position: relative;
     cursor: pointer;
+    transition: box-shadow 0.3s ease, transform 0.1s ease;
+}
+
+.knob:hover {
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.5);
+}
+
+.knob.active {
+    transform: scale(1.05);
+    box-shadow: 0 6px 12px rgba(0, 0, 0, 0.7);
 }
 
 .knob::before {
@@ -117,6 +127,12 @@ label {
     left: 50%;
     transform: translateX(-50%);
     border-radius: 2px;
+    transition: background-color 0.3s ease;
+}
+
+.knob:hover::before,
+.knob.active::before {
+    background-color: #34a853;
 }
 
 .knob-value {
