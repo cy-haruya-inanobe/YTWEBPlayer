@@ -69,47 +69,229 @@ function onPlayerError(event) {
     
     showMessage(errorMessage);
     console.log('エラーが発生した動画:', playlist[currentVideoIndex]);
-    removeCurrentVideoAndPlayNext();
+    
+    // エラーが発生した場合、次の動画に移動
+    playNextVideo();
 }
 
-// 現在の動画を削除して次の動画を再生
-function removeCurrentVideoAndPlayNext() {
-    console.log('問題のある動画を削除します:', playlist[currentVideoIndex]);
-    playlist.splice(currentVideoIndex, 1);
-    savePlaylist();
-    
+// プレイリストに動画を追加
+async function addVideoToPlaylist(url) {
+    try {
+        const videoId = extractVideoId(url);
+        if (!videoId) {
+            throw new Error('無効なYouTube URLです。');
+        }
+
+        // 重複チェック
+        if (playlist.some(video => video.id === videoId)) {
+            throw new Error('この動画は既にプレイリストに存在します。');
+        }
+
+        // 動画タイトルを取得
+        const title = await getVideoTitle(videoId);
+        if (title === `動画 ID: ${videoId}`) {
+            throw new Error('動画の情報を取得できませんでした。URLを確認してください。');
+        }
+
+        // 動画の埋め込み可否をチェック
+        await checkEmbedPermission(videoId);
+
+        // 動画をプレイリストに追加
+        const newVideo = { id: videoId, title: title };
+        const newVideoIndex = playlist.push(newVideo) - 1;
+        updatePlaylistUI();
+        savePlaylist();
+        
+        if (playlist.length === 1) {
+            try {
+                await initPlayer(videoId);
+                document.getElementById('player-container').style.display = 'block';
+            } catch (initError) {
+                console.error('プレイヤーの初期化中にエラーが発生しました:', initError);
+                showMessage('プレイヤーの初期化に失敗しました。ページを再読み込みしてください。');
+                // プレイリストから動画を削除
+                removeVideoFromPlaylist(newVideoIndex);
+                return;
+            }
+        }
+        showMessage('動画をプレイリストに追加しました');
+        
+        // 現在のインデックスの動画を再生
+        if (playlist.length > 0) {
+            fadeToVideo(playlist[currentVideoIndex].id);
+        }
+    } catch (error) {
+        showMessage(error.message);
+        console.error('動画追加エラー:', error);
+        // エラーが発生した場合、プレイリストから動画を削除
+        if (playlist.length > 0 && playlist[playlist.length - 1].id === videoId) {
+            removeVideoFromPlaylist(playlist.length - 1);
+        }
+    }
+
+    // プレイリストが空の場合、プレイヤーを非表示にする
     if (playlist.length === 0) {
-        showMessage('プレイリストが空になりました。');
         document.getElementById('player-container').style.display = 'none';
-        currentVideoIndex = 0;
-    } else {
-        currentVideoIndex = currentVideoIndex % playlist.length;
-        playNextVideo();
+    }
+}
+
+// 動画の埋め込み可否をチェックする関数
+async function checkEmbedPermission(videoId) {
+    return new Promise((resolve, reject) => {
+        const tempPlayer = new YT.Player('temp-player', {
+            height: '1',
+            width: '1',
+            videoId: videoId,
+            events: {
+                'onReady': () => {
+                    tempPlayer.destroy();
+                    resolve();
+                },
+                'onError': (event) => {
+                    tempPlayer.destroy();
+                    if (event.data === 101 || event.data === 150) {
+                        reject(new Error('この動画は埋め込みが許可されていません。プレイリストに追加できません。'));
+                    } else {
+                        reject(new Error('動画の読み込み中にエラーが発生しました。URLを確認してください。'));
+                    }
+                }
+            }
+        });
+    });
+}
+
+// プレイヤーエラー時の処理
+function onPlayerError(event) {
+    console.log('onPlayerError が呼び出されました。event:', event);
+    console.error('YouTube Player Error:', event.data);
+    let errorMessage = '動画の再生中にエラーが発生しました。';
+
+    switch (event.data) {
+        case 2:
+            errorMessage += '無効なパラメータが指定されました。';
+            break;
+        case 5:
+            errorMessage += 'HTML5プレーヤーで再生できない動画です。';
+            break;
+        case 100:
+            errorMessage += '動画が見つかりません。';
+            break;
+        case 101:
+        case 150:
+            errorMessage += '動画の埋め込みが許可されていません。';
+            break;
     }
     
-    updatePlaylistUI();
+    showMessage(errorMessage);
+    console.log('エラーが発生した動画:', playlist[currentVideoIndex]);
+    
+    // エラーが発生した動画を削除
+    removeVideoFromPlaylist(currentVideoIndex);
+    
+    if (playlist.length > 0) {
+        // 次の動画を再生
+        playNextVideo();
+    } else {
+        // プレイリストが空になった場合、プレイヤーを非表示にする
+        document.getElementById('player-container').style.display = 'none';
+    }
 }
 
-// プレイヤーの準備ができたら呼び出される関数
-function onPlayerReady(event) {
-    volume = event.target.getVolume();
-    event.target.playVideo();
-    updateVolumeDisplay();
-    updateFadeSpeedDisplay();
-    updatePlaybackRateDisplay();
-    // 定期的に音量を同期
-    setInterval(syncVolume, 1000);
-}
-
-// プレイヤーの実際の音量と表示を同期する関数
-function syncVolume() {
-    if (player && player.getVolume && typeof player.getVolume === 'function') {
-        try {
-            volume = player.getVolume();
-            updateVolumeDisplay();
-        } catch (error) {
-            console.error('音量の同期中にエラーが発生しました:', error);
+// プレイリストから動画を削除
+function removeVideoFromPlaylist(index) {
+    try {
+        playlist.splice(index, 1);
+        
+        if (playlist.length === 0) {
+            document.getElementById('player-container').style.display = 'none';
+            currentVideoIndex = 0;
+        } else if (index === currentVideoIndex) {
+            // 現在再生中の動画が削除された場合、次の動画を再生
+            currentVideoIndex = currentVideoIndex % playlist.length;
+            fadeToVideo(playlist[currentVideoIndex].id);
+        } else if (index < currentVideoIndex) {
+            currentVideoIndex--;
         }
+        
+        updatePlaylistUI();
+        savePlaylist();
+        saveCurrentIndex();
+        showMessage('動画をプレイリストから削除しました');
+    } catch (error) {
+        console.error('動画の削除中にエラーが発生しました:', error);
+        showMessage('動画の削除に失敗しました。再試行してください。');
+    }
+}
+
+// プレイヤーエラー時の処理
+function onPlayerError(event) {
+    console.log('onPlayerError が呼び出されました。event:', event);
+    console.error('YouTube Player Error:', event.data);
+    let errorMessage = '動画の再生中にエラーが発生しました。';
+
+    switch (event.data) {
+        case 2:
+            errorMessage += '無効なパラメータが指定されました。';
+            break;
+        case 5:
+            errorMessage += 'HTML5プレーヤーで再生できない動画です。';
+            break;
+        case 100:
+            errorMessage += '動画が見つかりません。';
+            break;
+        case 101:
+        case 150:
+            errorMessage += '動画の埋め込みが許可されていません。';
+            break;
+    }
+    
+    showMessage(errorMessage);
+    console.log('エラーが発生した動画:', playlist[currentVideoIndex]);
+    
+    // エラーが発生した動画を削除
+    removeVideoFromPlaylist(currentVideoIndex);
+    
+    if (playlist.length > 0) {
+        // 次の動画を再生
+        playNextVideo();
+    } else {
+        // プレイリストが空になった場合、プレイヤーを非表示にする
+        document.getElementById('player-container').style.display = 'none';
+    }
+}
+
+// プレイヤーエラー時の処理
+function onPlayerError(event) {
+    console.log('onPlayerError が呼び出されました。event:', event);
+    console.error('YouTube Player Error:', event.data);
+    let errorMessage = '動画の再生中にエラーが発生しました。';
+
+    switch (event.data) {
+        case 2:
+            errorMessage += '無効なパラメータが指定されました。';
+            break;
+        case 5:
+            errorMessage += 'HTML5プレーヤーで再生できない動画です。';
+            break;
+        case 100:
+            errorMessage += '動画が見つかりません。';
+            break;
+        case 101:
+        case 150:
+            errorMessage += '動画の埋め込みが許可されていません。';
+            break;
+    }
+    
+    showMessage(errorMessage);
+    console.log('エラーが発生した動画:', playlist[currentVideoIndex]);
+    
+    // エラーが発生した動画を削除し、次の動画を再生
+    removeVideoFromPlaylist(currentVideoIndex);
+    if (playlist.length > 0) {
+        playNextVideo();
+    } else {
+        // プレイリストが空になった場合、プレイヤーを非表示にする
+        document.getElementById('player-container').style.display = 'none';
     }
 }
 
@@ -319,47 +501,159 @@ function onPlayerError(event) {
     
     showMessage(errorMessage);
     console.log('エラーが発生した動画:', playlist[currentVideoIndex]);
-    removeCurrentVideoAndPlayNext();
+    removeVideoFromPlaylist(currentVideoIndex);
 }
 
-// 現在の動画を削除して次の動画を再生
-function removeCurrentVideoAndPlayNext() {
-    console.log('問題のある動画を削除します:', playlist[currentVideoIndex]);
-    playlist.splice(currentVideoIndex, 1);
-    savePlaylist();
-    
+// プレイリストに動画を追加
+async function addVideoToPlaylist(url) {
+    try {
+        const videoId = extractVideoId(url);
+        if (!videoId) {
+            throw new Error('無効なYouTube URLです。');
+        }
+
+        // 重複チェック
+        if (playlist.some(video => video.id === videoId)) {
+            throw new Error('この動画は既にプレイリストに存在します。');
+        }
+
+        // 動画タイトルを取得
+        const title = await getVideoTitle(videoId);
+        if (title === `動画 ID: ${videoId}`) {
+            throw new Error('動画の情報を取得できませんでした。URLを確認してください。');
+        }
+
+        // 動画の埋め込み可否をチェック
+        try {
+            await checkEmbedPermission(videoId);
+        } catch (error) {
+            if (error.message === 'ERROR_CODE_150') {
+                showMessage('この動画は埋め込みが許可されていません。プレイリストに追加できません。');
+                return;
+            }
+            throw error;
+        }
+
+        // 動画をプレイリストに追加
+        const newVideo = { id: videoId, title: title };
+        playlist.push(newVideo);
+        updatePlaylistUI();
+        savePlaylist();
+        
+        if (playlist.length === 1) {
+            try {
+                await initPlayer(videoId);
+                document.getElementById('player-container').style.display = 'block';
+            } catch (initError) {
+                console.error('プレイヤーの初期化中にエラーが発生しました:', initError);
+                showMessage('プレイヤーの初期化に失敗しました。ページを再読み込みしてください。');
+                // プレイリストから動画を削除
+                removeVideoFromPlaylist(playlist.length - 1);
+                return;
+            }
+        }
+        showMessage('動画をプレイリストに追加しました');
+        
+        // 現在のインデックスの動画を再生
+        if (playlist.length > 0) {
+            fadeToVideo(playlist[currentVideoIndex].id);
+        }
+    } catch (error) {
+        showMessage(error.message);
+        console.error('動画追加エラー:', error);
+    }
+
+    // プレイリストが空の場合、プレイヤーを非表示にする
     if (playlist.length === 0) {
-        showMessage('プレイリストが空になりました。');
         document.getElementById('player-container').style.display = 'none';
-        currentVideoIndex = 0;
-    } else {
-        currentVideoIndex = currentVideoIndex % playlist.length;
-        playNextVideo();
+    }
+}
+
+// 動画の埋め込み可否をチェックする関数
+async function checkEmbedPermission(videoId) {
+    return new Promise((resolve, reject) => {
+        const tempPlayer = new YT.Player('temp-player', {
+            height: '1',
+            width: '1',
+            videoId: videoId,
+            events: {
+                'onReady': () => {
+                    tempPlayer.destroy();
+                    resolve();
+                },
+                'onError': (event) => {
+                    tempPlayer.destroy();
+                    if (event.data === 101 || event.data === 150) {
+                        reject(new Error('ERROR_CODE_150'));
+                    } else {
+                        reject(new Error('動画の読み込み中にエラーが発生しました。'));
+                    }
+                }
+            }
+        });
+    });
+}
+
+// プレイリストから動画を削除
+function removeVideoFromPlaylist(index) {
+    try {
+        playlist.splice(index, 1);
+        
+        if (playlist.length === 0) {
+            document.getElementById('player-container').style.display = 'none';
+            currentVideoIndex = 0;
+        } else if (index === currentVideoIndex) {
+            // 現在再生中の動画が削除された場合、次の動画を再生
+            currentVideoIndex = currentVideoIndex % playlist.length;
+            fadeToVideo(playlist[currentVideoIndex].id);
+        } else if (index < currentVideoIndex) {
+            currentVideoIndex--;
+        }
+        
+        updatePlaylistUI();
+        savePlaylist();
+        saveCurrentIndex();
+        showMessage('動画をプレイリストから削除しました');
+    } catch (error) {
+        console.error('動画の削除中にエラーが発生しました:', error);
+        showMessage('動画の削除に失敗しました。再試行してください。');
+    }
+}
+
+// プレイヤーエラー時の処理
+function onPlayerError(event) {
+    console.log('onPlayerError が呼び出されました。event:', event);
+    console.error('YouTube Player Error:', event.data);
+    let errorMessage = '動画の再生中にエラーが発生しました。';
+
+    switch (event.data) {
+        case 2:
+            errorMessage += '無効なパラメータが指定されました。';
+            break;
+        case 5:
+            errorMessage += 'HTML5プレーヤーで再生できない動画です。';
+            break;
+        case 100:
+            errorMessage += '動画が見つかりません。';
+            break;
+        case 101:
+        case 150:
+            errorMessage += '動画の埋め込みが許可されていません。';
+            break;
     }
     
-    updatePlaylistUI();
-}
-
-// プレイヤーの準備ができたら呼び出される関数
-function onPlayerReady(event) {
-    volume = event.target.getVolume();
-    event.target.playVideo();
-    updateVolumeDisplay();
-    updateFadeSpeedDisplay();
-    updatePlaybackRateDisplay();
-    // 定期的に音量を同期
-    setInterval(syncVolume, 1000);
-}
-
-// プレイヤーの実際の音量と表示を同期する関数
-function syncVolume() {
-    if (player && player.getVolume && typeof player.getVolume === 'function') {
-        try {
-            volume = player.getVolume();
-            updateVolumeDisplay();
-        } catch (error) {
-            console.error('音量の同期中にエラーが発生しました:', error);
-        }
+    showMessage(errorMessage);
+    console.log('エラーが発生した動画:', playlist[currentVideoIndex]);
+    
+    // エラーが発生した動画を削除
+    removeVideoFromPlaylist(currentVideoIndex);
+    
+    if (playlist.length > 0) {
+        // 次の動画を再生
+        playNextVideo();
+    } else {
+        // プレイリストが空になった場合、プレイヤーを非表示にする
+        document.getElementById('player-container').style.display = 'none';
     }
 }
 
@@ -450,43 +744,214 @@ function fadeToVideo(videoId) {
         return;
     }
 
-    const fadeDuration = fadeSpeed * 1000; // フェード時間（ミリ秒）
-    const originalVolume = volume; // フェードアウト前の音量を保存
-    const steps = 100; // フェードのステップ数
-    const stepDuration = fadeDuration / steps;
+    // プレイリスト内の動画IDを確認
+    if (!playlist.some(video => video.id === videoId)) {
+        console.error('指定された動画IDがプレイリストに存在しません');
+        showMessage('指定された動画が見つかりません');
+        return;
+    }
+
+    const fadeDuration = Math.max(100, fadeSpeed * 1000); // 最小フェード時間を100ミリ秒に設定
+    const originalVolume = player.getVolume(); // 現在の音量を取得
+    const steps = 60; // フェードのステップ数
+    const stepDuration = fadeDuration / (steps * 2); // フェードアウトとフェードインの合計時間
     const volumeStep = originalVolume / steps;
 
-    // フェードアウト
-    const fadeOutInterval = setInterval(() => {
-        volume = Math.max(0, volume - volumeStep);
-        player.setVolume(volume);
-        updateVolumeDisplay();
-        
-        if (volume <= 0) {
-            clearInterval(fadeOutInterval);
-            // 新しい動画をロード
-            player.loadVideoById({
-                videoId: videoId,
-                events: {
-                    'onReady': (event) => {
-                        console.log('新しい動画がロードされ、再生準備ができました');
-                        event.target.playVideo();
-                        // フェードイン
-                        const fadeInInterval = setInterval(() => {
-                            volume = Math.min(originalVolume, volume + volumeStep);
-                            player.setVolume(volume);
-                            updateVolumeDisplay();
-                            
-                            if (volume >= originalVolume) {
-                                clearInterval(fadeInInterval);
-                                console.log('フェードインが完了しました');
-                            }
-                        }, stepDuration);
-                    }
-                }
-            });
+    // 既存のフェード処理をクリア
+    if (window.fadeInterval) {
+        clearInterval(window.fadeInterval);
+    }
+
+    // フェードなしの即時切り替え
+    if (fadeSpeed === 0) {
+        try {
+            player.loadVideoById(videoId);
+            setPlayerVolume(originalVolume);
+            console.log('フェードなしで動画を切り替えました');
+        } catch (error) {
+            console.error('動画の切り替え中にエラーが発生しました:', error);
+            showMessage('動画の切り替えに失敗しました。再試行してください。');
+        }
+        return;
+    }
+
+    let currentStep = 0;
+    let isLoadingNewVideo = false;
+
+    const performFade = () => {
+        if (currentStep <= steps) {
+            // フェードアウト
+            const newVolume = Math.max(0, originalVolume - (volumeStep * currentStep));
+            setPlayerVolume(newVolume);
+        } else if (currentStep === steps + 1 && !isLoadingNewVideo) {
+            isLoadingNewVideo = true;
+            try {
+                player.loadVideoById(videoId);
+                player.playVideo();
+            } catch (error) {
+                console.error('動画のロード中にエラーが発生しました:', error);
+                showMessage('動画の切り替えに失敗しました。再試行してください。');
+                return false;
+            }
+        } else if (currentStep > steps + 1) {
+            // フェードイン
+            const newVolume = Math.min(originalVolume, volumeStep * (currentStep - steps - 1));
+            setPlayerVolume(newVolume);
+        }
+
+        if (currentStep >= steps * 2 + 1) {
+            // フェード完了
+            setPlayerVolume(originalVolume);
+            console.log('フェードが完了しました');
+            return false;
+        }
+
+        currentStep++;
+        return true;
+    };
+
+    const fadeInterval = setInterval(() => {
+        if (!performFade()) {
+            clearInterval(fadeInterval);
         }
     }, stepDuration);
+}
+
+// プレイヤーの音量を設定し、グローバル変数と表示を更新
+function setPlayerVolume(newVolume) {
+    newVolume = Math.max(0, Math.min(100, parseFloat(newVolume.toFixed(1))));
+    if (player && player.setVolume) {
+        player.setVolume(newVolume);
+    }
+    volume = newVolume;
+    updateVolumeDisplay();
+}
+
+// 音量表示を更新
+function updateVolumeDisplay() {
+    const displayVolume = Math.round(volume * 10) / 10; // 小数点第一位まで表示
+    requestAnimationFrame(() => {
+        document.getElementById('volume-value').textContent = displayVolume.toFixed(1);
+        document.getElementById('volume').value = displayVolume;
+        rotateKnob('volume-knob', displayVolume, 0, 100);
+    });
+}
+
+// プレイヤーの音量と表示を同期
+function syncVolume() {
+    if (player && player.getVolume) {
+        const playerVolume = player.getVolume();
+        if (Math.abs(playerVolume - volume) > 0.1) {
+            setPlayerVolume(playerVolume);
+        }
+    }
+}
+
+// フェード速度を設定
+function setFadeSpeed(newSpeed) {
+    fadeSpeed = Math.max(0, Math.min(5, parseFloat(newSpeed.toFixed(1))));
+    updateFadeSpeedDisplay();
+}
+
+// フェード速度表示を更新
+function updateFadeSpeedDisplay() {
+    const fadeSpeedValue = document.getElementById('fade-speed-value');
+    fadeSpeedValue.textContent = fadeSpeed.toFixed(1);
+    document.getElementById('fade-speed').value = fadeSpeed;
+    rotateKnob('fade-speed-knob', fadeSpeed, 0, 5);
+}
+
+// 音量を設定
+function setVolume(newVolume) {
+    volume = Math.max(0, Math.min(100, parseFloat(newVolume.toFixed(1))));
+    if (player && player.setVolume) {
+        player.setVolume(volume);
+    }
+    updateVolumeDisplay();
+}
+
+// 音量表示を更新
+function updateVolumeDisplay() {
+    document.getElementById('volume-value').textContent = volume.toFixed(1);
+    document.getElementById('volume').value = volume;
+    rotateKnob('volume-knob', volume, 0, 100);
+}
+
+// 音量を設定
+function setVolume(newVolume) {
+    volume = Math.max(0, Math.min(100, parseFloat(newVolume.toFixed(1))));
+    if (player && player.setVolume) {
+        player.setVolume(volume);
+    }
+    updateVolumeDisplay();
+}
+
+// 音量表示を更新
+function updateVolumeDisplay() {
+    const currentVolume = player && player.getVolume ? player.getVolume() : volume;
+    document.getElementById('volume-value').textContent = currentVolume.toFixed(1);
+    document.getElementById('volume').value = currentVolume;
+    rotateKnob('volume-knob', currentVolume, 0, 100);
+}
+
+// フェード速度を設定
+function setFadeSpeed(newSpeed) {
+    fadeSpeed = Math.max(0, Math.min(5, parseFloat(newSpeed.toFixed(1))));
+    updateFadeSpeedDisplay();
+}
+
+// フェード速度表示を更新
+function updateFadeSpeedDisplay() {
+    const fadeSpeedValue = document.getElementById('fade-speed-value');
+    fadeSpeedValue.textContent = fadeSpeed.toFixed(1);
+    document.getElementById('fade-speed').value = fadeSpeed;
+    rotateKnob('fade-speed-knob', fadeSpeed, 0, 5);
+}
+
+// 音量を設定
+function setVolume(newVolume) {
+    volume = Math.max(0, Math.min(100, parseFloat(newVolume.toFixed(1))));
+    if (player && player.setVolume) {
+        player.setVolume(volume);
+    }
+    updateVolumeDisplay();
+}
+
+// 音量表示を更新
+function updateVolumeDisplay() {
+    document.getElementById('volume-value').textContent = volume.toFixed(1);
+    document.getElementById('volume').value = volume;
+    rotateKnob('volume-knob', volume, 0, 100);
+}
+
+// 音量表示を更新（プレイヤーの音量を変更せずに）
+function updateVolumeDisplay() {
+    const currentVolume = player.getVolume();
+    document.getElementById('volume-value').textContent = currentVolume.toFixed(1);
+    document.getElementById('volume').value = currentVolume;
+    rotateKnob('volume-knob', currentVolume, 0, 100);
+}
+
+// フェード速度を設定
+function setFadeSpeed(newSpeed) {
+    fadeSpeed = Math.max(0, Math.min(5, parseFloat(newSpeed.toFixed(1))));
+    updateFadeSpeedDisplay();
+}
+
+// フェード速度表示を更新
+function updateFadeSpeedDisplay() {
+    const fadeSpeedValue = document.getElementById('fade-speed-value');
+    fadeSpeedValue.textContent = fadeSpeed.toFixed(1);
+    document.getElementById('fade-speed').value = fadeSpeed;
+    rotateKnob('fade-speed-knob', fadeSpeed, 0, 5);
+}
+
+// 音量表示を更新（プレイヤーの音量を変更せずに）
+function updateVolumeDisplay() {
+    const currentVolume = player.getVolume();
+    document.getElementById('volume-value').textContent = currentVolume.toFixed(1);
+    document.getElementById('volume').value = currentVolume;
+    rotateKnob('volume-knob', currentVolume, 0, 100);
 }
 
 // つまみの回転を制御する関数
@@ -619,18 +1084,67 @@ async function addVideoToPlaylist(url) {
         // 動画タイトルを取得
         const title = await getVideoTitle(videoId);
         playlist.push({ id: videoId, title: title });
+        removeDuplicatesFromPlaylist();
         updatePlaylistUI();
         savePlaylist();
         
         if (playlist.length === 1) {
-            await initPlayer(videoId);
-            document.getElementById('player-container').style.display = 'block';
+            try {
+                await initPlayer(videoId);
+                document.getElementById('player-container').style.display = 'block';
+            } catch (initError) {
+                console.error('プレイヤーの初期化中にエラーが発生しました:', initError);
+                showMessage('プレイヤーの初期化に失敗しました。ページを再読み込みしてください。');
+                // プレイリストから動画を削除
+                playlist.pop();
+                updatePlaylistUI();
+                savePlaylist();
+                return;
+            }
         }
         showMessage('動画をプレイリストに追加しました');
     } catch (error) {
         showMessage(error.message);
         console.error('動画追加エラー:', error);
     }
+}
+
+// プレイヤーの初期化を改善
+async function initPlayer(videoId) {
+    console.log('プレイヤーの初期化を開始します。Video ID:', videoId);
+    if (typeof YT === 'undefined' || !YT.Player) {
+        throw new Error('YouTube IFrame APIが読み込まれていません');
+    }
+
+    return new Promise((resolve, reject) => {
+        try {
+            player = new YT.Player('player', {
+                height: '360',
+                width: '640',
+                videoId: videoId,
+                playerVars: {
+                    'autoplay': 1,
+                    'controls': 1,
+                    'rel': 0,
+                    'fs': 1
+                },
+                events: {
+                    'onReady': (event) => {
+                        console.log('プレイヤーの初期化が完了しました。');
+                        resolve(event.target);
+                    },
+                    'onStateChange': onPlayerStateChange,
+                    'onError': (event) => {
+                        console.error('YouTube Player Error:', event.data);
+                        reject(new Error('プレイヤーの初期化中にエラーが発生しました'));
+                    }
+                }
+            });
+        } catch (error) {
+            console.error('プレイヤーの初期化中にエラーが発生しました:', error);
+            reject(error);
+        }
+    });
 }
 
 // YouTube IFrame APIの読み込みを確認する関数
@@ -945,7 +1459,6 @@ function removeVideoFromPlaylist(index) {
 
 // プレイリストをローカルストレージに保存
 function savePlaylist() {
-    removeDuplicatesFromPlaylist(); // 保存前に重複を除去
     localStorage.setItem('youtubePlaylist', JSON.stringify(playlist));
     console.log('プレイリストを保存しました:', playlist);
 }
@@ -1059,3 +1572,21 @@ function loadYouTubeAPI() {
             });
     };
 }
+
+// 広告ブロッカーによるエラーを処理する関数
+function handleAdBlockerError() {
+    window.addEventListener('error', function(e) {
+        if (e.filename.includes('pagead') || e.filename.includes('googleads')) {
+            console.warn('広告ブロッカーによってリクエストがブロックされました:', e.filename);
+            showMessage('広告ブロッカーが有効になっています。一部の機能に影響がある可能性があります。');
+        }
+    });
+}
+
+// DOMContentLoadedイベントリスナーに広告ブロッカーエラー処理を追加
+document.addEventListener('DOMContentLoaded', () => {
+    // 既存のコード...
+
+    // 広告ブロッカーエラー処理を追加
+    handleAdBlockerError();
+});
