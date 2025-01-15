@@ -26,7 +26,11 @@ function initPlayer(videoId) {
                     'autoplay': 1,
                     'controls': 1,
                     'rel': 0,
-                    'fs': 1
+                    'fs': 1,
+                    'modestbranding': 1,
+                    'iv_load_policy': 3,
+                    'disablekb': 1,
+                    'host': 'https://www.youtube-nocookie.com'
                 },
                 events: {
                     'onReady': onPlayerReady,
@@ -295,6 +299,17 @@ function onPlayerError(event) {
     }
 }
 
+// 広告をブロックする関数
+function blockAds() {
+    const adElements = document.querySelectorAll('.ytp-ad-module, .ytp-ad-image-overlay');
+    adElements.forEach(el => el.style.display = 'none');
+
+    const videoAds = document.querySelectorAll('.ad-showing');
+    videoAds.forEach(ad => {
+        player.seekTo(player.getDuration());
+    });
+}
+
 // プレイヤーの状態が変化したときに呼び出される関数
 function onPlayerStateChange(event) {
     if (event.data == YT.PlayerState.ENDED) {
@@ -305,27 +320,27 @@ function onPlayerStateChange(event) {
             playNextVideo();
         }
     } else if (event.data == YT.PlayerState.PLAYING) {
-        // 広告スキップ処理を一時的に無効化
-        // checkForAd();
         player.setPlaybackRate(playbackRate);
+        blockAds();
     }
 }
 
-// 広告をチェックしてスキップする関数
-function checkForAd() {
-    if (player.getVideoUrl().includes('&ad')) {
-        console.log('広告を検出しました。スキップを試みます。');
-        const skipInterval = setInterval(() => {
-            const skipButton = document.querySelector('.ytp-ad-skip-button');
-            if (skipButton) {
-                skipButton.click();
-                clearInterval(skipInterval);
-                console.log('広告をスキップしました。');
-            }
-        }, 1000);
-        setTimeout(() => clearInterval(skipInterval), 10000); // 10秒後にインターバルを停止
-    }
+// 動画の読み込み時に広告をブロックする
+function onPlayerReady(event) {
+    blockAds();
+    event.target.playVideo();
 }
+
+// MutationObserverを使用して動的に追加される広告要素を監視
+const adObserver = new MutationObserver(mutations => {
+    mutations.forEach(mutation => {
+        if (mutation.addedNodes.length) {
+            blockAds();
+        }
+    });
+});
+
+adObserver.observe(document.body, { childList: true, subtree: true });
 
 // 次の動画を再生
 function playNextVideo() {
@@ -1583,10 +1598,40 @@ function handleAdBlockerError() {
     });
 }
 
+// 設定を保存する関数
+function saveSettings() {
+    const settings = {
+        volume: volume,
+        fadeSpeed: fadeSpeed,
+        playbackRate: playbackRate
+    };
+    localStorage.setItem('youtubePlayerSettings', JSON.stringify(settings));
+    showMessage('設定を保存しました');
+}
+
+// 設定を読み込む関数
+function loadSettings() {
+    const savedSettings = localStorage.getItem('youtubePlayerSettings');
+    if (savedSettings) {
+        const settings = JSON.parse(savedSettings);
+        setVolume(settings.volume);
+        setFadeSpeed(settings.fadeSpeed);
+        updatePlaybackRate(settings.playbackRate);
+        showMessage('設定を読み込みました');
+    }
+}
+
 // DOMContentLoadedイベントリスナーに広告ブロッカーエラー処理を追加
 document.addEventListener('DOMContentLoaded', () => {
     // 既存のコード...
 
     // 広告ブロッカーエラー処理を追加
     handleAdBlockerError();
+
+    // 設定保存・読み込みボタンのイベントリスナーを追加
+    document.getElementById('save-settings').addEventListener('click', saveSettings);
+    document.getElementById('load-settings').addEventListener('click', loadSettings);
+
+    // 初期設定を読み込む
+    loadSettings();
 });
