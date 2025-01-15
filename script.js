@@ -1621,6 +1621,24 @@ function enhancedBlockAds() {
     }
 }
 
+// 広告を検出する関数
+function detectAd() {
+    if (player && player.getVideoUrl) {
+        const videoUrl = player.getVideoUrl();
+        return videoUrl.includes('&ad') || document.querySelector('.ytp-ad-player-overlay');
+    }
+    return false;
+}
+
+// 動画を再ロードする関数
+function reloadVideo() {
+    if (player && player.loadVideoById) {
+        const currentTime = player.getCurrentTime();
+        const videoId = player.getVideoData().video_id;
+        player.loadVideoById(videoId, currentTime);
+    }
+}
+
 // プレイヤーの状態が変化したときに呼び出される関数（更新版）
 function onPlayerStateChange(event) {
     if (event.data == YT.PlayerState.ENDED) {
@@ -1633,8 +1651,32 @@ function onPlayerStateChange(event) {
     } else if (event.data == YT.PlayerState.PLAYING) {
         player.setPlaybackRate(playbackRate);
         enhancedBlockAds();
+        
+        // 広告が検出された場合、動画を再ロード
+        if (detectAd()) {
+            console.log('広告が検出されました。動画を再ロードします。');
+            reloadVideo();
+        }
     }
 }
+
+// 定期的に広告をチェックする関数
+function checkForAdsRegularly() {
+    setInterval(() => {
+        if (detectAd()) {
+            console.log('広告が検出されました。動画を再ロードします。');
+            reloadVideo();
+        }
+    }, 5000); // 5秒ごとにチェック
+}
+
+// DOMContentLoadedイベントリスナーに広告チェック機能を追加
+document.addEventListener('DOMContentLoaded', () => {
+    // 既存のコード...
+
+    // 定期的な広告チェックを開始
+    checkForAdsRegularly();
+});
 
 // 動画の直接URLを使用したストリーミング（注意：YouTubeの利用規約に違反する可能性があります）
 async function getDirectVideoUrl(videoId) {

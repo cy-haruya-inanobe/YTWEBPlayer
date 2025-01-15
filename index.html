@@ -56,38 +56,6 @@
             <ul id="playlist"></ul>
         </div>
     </div>
-    <script>
-        const iframes = document.querySelectorAll('iframe[src^="https://www.youtube.com/embed/"]');
-
-        iframes.forEach(iframe => {
-             iframe.onload = () => {
-            const iframeDocument = iframe.contentDocument || iframe.contentWindow.document;
-
-            const observer = new MutationObserver((mutationsList) => {
-                for (let mutation of mutationsList) {
-                    if (mutation.type === 'childList') {
-                        mutation.addedNodes.forEach(node => {
-                            // 広告要素を特定して削除（これは一例。YouTubeの構造変更に対応するため、複数のパターンを検討する必要あり）
-                            if (node.classList?.contains('ytp-ad-player-overlay') || node.classList?.contains('ytp-ad-progress-list') || node.classList?.contains('ytp-ad-overlay-close-button'))
-                             {
-                                 node.remove();
-                             }
-                             
-                            const adElement = node.querySelector('.ytp-ad-player-overlay, .ytp-ad-progress-list, .ytp-ad-overlay-close-button');
-                            if (adElement) {
-                                 adElement.remove();
-                            }
-                            
-                         });
-                    }
-                }
-            });
-
-            observer.observe(iframeDocument.body, { childList: true, subtree: true });
-         };
-        });
-
-    </script>
     <script src="script.js"></script>
 </body>
 </html>
